@@ -7,30 +7,9 @@ import time
 import uuid
 from dotenv import load_dotenv
 
-load_dotenv()
-token = os.environ["SWITCHBOT_TOKEN"]
+from switchbot_api import BASE_URL, make_headers
 
-secret = os.environ["SWITCHBOT_SECRET"]
-
-# 電子署名
-t = str(int(time.time() * 1000))
-nonce = str(uuid.uuid4())
-string_to_sign = token + t + nonce
-
-sign = base64.b64encode(
-    hmac.new(secret.encode(), string_to_sign.encode(), hashlib.sha256).digest()
-).decode()
-
-response = requests.get(
-    "https://api.switch-bot.com/v1.1/devices", 
-    headers={
-        "Authorization": token,
-        "sign": sign,
-        "t": t,
-        "nonce": nonce, 
-        },
-    )
-
+response = requests.get(f"{BASE_URL}/devices", headers=make_headers())
 data = response.json()
 
 print("statusCode: ", data["statusCode"])
