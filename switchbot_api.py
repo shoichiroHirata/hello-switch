@@ -5,6 +5,8 @@ import os
 import time
 import uuid
 
+import requests
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -31,3 +33,16 @@ def make_headers():
         "t": t,
         "nonce": nonce,    
     }
+
+import requests
+def send_command(device_id, command):
+    response = requests.post(
+        f"{BASE_URL}/devices/{device_id}/commands",
+        headers=make_headers(),
+        json={
+            "command": command,
+            "parameter": "default",
+            "commandType": "command",
+        },
+    )
+    return response.json()
