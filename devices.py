@@ -14,5 +14,5 @@ data = response.json()
 
 print("statusCode: ", data["statusCode"])
 for device in data["body"]["infraredRemoteList"]:
-    print(device["deviceName"], device["remoteType"])
+    print(device["deviceId"], device["deviceName"], device["remoteType"])
 
