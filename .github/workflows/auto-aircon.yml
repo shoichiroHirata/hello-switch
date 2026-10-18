@@ -1,0 +1,21 @@
+name: Auto Aircon
+
+on:
+  schedule:
+    - cron: "0 19 * * *"  # 毎日 4:00 JST(= 19:00 UTC)
+  workflow_dispatch:      # 手動実行用
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - run: pip install -r requirements.txt
+      - run: python auto_aircon.py
+        env:
+          SWITCHBOT_TOKEN: ${{ secrets.SWITCHBOT_TOKEN }}
+          SWITCHBOT_SECRET: ${{ secrets.SWITCHBOT_SECRET }}
+          SWITCHBOT_AIRCON_ID: ${{ secrets.SWITCHBOT_AIRCON_ID }}
