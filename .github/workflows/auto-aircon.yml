@@ -3,7 +3,11 @@ name: Auto Aircon
 on:
   schedule:
     - cron: "0 19 * * *"  # 毎日 4:00 JST(= 19:00 UTC)
-  workflow_dispatch:      # 手動実行用
+  workflow_dispatch:     # 手動実行用
+    inputs:
+      threshold:
+        description: "テスト用のしきい値(℃)。空なら10℃"
+        required: false      # 手動実行用
 
 jobs:
   run:
@@ -19,3 +23,4 @@ jobs:
           SWITCHBOT_TOKEN: ${{ secrets.SWITCHBOT_TOKEN }}
           SWITCHBOT_SECRET: ${{ secrets.SWITCHBOT_SECRET }}
           SWITCHBOT_AIRCON_ID: ${{ secrets.SWITCHBOT_AIRCON_ID }}
+          AIRCON_THRESHOLD: ${{ inputs.threshold }}

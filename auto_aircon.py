@@ -3,7 +3,7 @@ import os
 from switchbot_api import send_command
 from weather import get_min_temperature
 
-THRESHOLD = 10
+THRESHOLD = float(os.environ.get("AIRCON_THRESHOLD") or 10)
 
 device_id = os.environ["SWITCHBOT_AIRCON_ID"]
 min_temperature = get_min_temperature()
