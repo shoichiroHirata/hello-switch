@@ -1,82 +1,155 @@
 # hello-switch
 
-SwitchBot API を使って、家の家電(SwitchBot ハブ経由の赤外線リモコン)を Python で操作するプロジェクトです。
+SwitchBot API を使って、SwitchBot ハブに登録した赤外線リモコン家電を Python から操作するツールです。
 
-## 目標
-
-- **最終目標:** 長崎市の最低気温を外部から取得し、明け方に自動でエアコンを操作する
-  - 実行する条件(何度以下で、何時に、暖房か冷房か)は未定
-- **将来:** アプリから家電を操作できるようにする(アプリの種類は未定)
+毎朝 4:00(JST)に長崎市の最低気温の予報を取得し、10℃以下であればエアコンを ON にします。
 
 ## 機能
 
-| 機能 | 状態 |
+| 機能 | スクリプト |
 |---|---|
-| デバイス一覧の取得(API v1.1、署名付き) | ✅ 完了(`devices.py`) |
-| ライトの ON/OFF | 未着手 |
-| シーンの実行 | Postman で動作確認済み、Python は未着手 |
-| 長崎市の最低気温の取得 | 未着手 |
-| 気温に応じたエアコンの自動操作 | 未着手 |
-| GitHub Actions による定期実行 | 未着手 |
-| アプリからの操作 | 未着手 |
+| デバイス一覧の表示 | `devices.py` |
+| シーンの実行 | `scene.py` |
+| ライトの ON/OFF | `light.py` |
+| 長崎市の今日の最低気温の取得 | `weather.py` |
+| 最低気温に応じたエアコンの自動 ON | `auto_aircon.py` |
+| 毎朝の定期実行 | `.github/workflows/auto-aircon.yml` |
 
-## 技術スタック
+## 仕様
 
-| 役割 | 使うもの |
-|---|---|
-| 言語 | Python 3.13 |
-| 環境管理 | venv + pip(`requirements.txt`) |
-| HTTP 通信 | requests |
-| キー管理(ローカル) | python-dotenv(`.env`) |
-| キー管理(自動実行) | GitHub Secrets |
-| SwitchBot API | v1.1(トークン + シークレットによる HMAC-SHA256 署名) |
-| 天気データ | Open-Meteo(無料、API キー不要) |
-| 自動実行 | GitHub Actions(定期実行) |
-| API の動作確認 | Postman |
-| バージョン管理 | Git / GitHub(public リポジトリ) |
-
-## ディレクトリ構成
+### エアコンの自動 ON
 
 ```
-hello-switch/
-├── devices.py         # デバイス一覧を表示する
-├── requirements.txt   # 使うライブラリの一覧
-├── .env.example       # .env のひな形
-├── .env               # トークン・シークレット(Git 管理外)
-├── .venv/             # Python 仮想環境(Git 管理外)
-├── .postman/          # Postman ワークスペースの設定
-└── postman/           # Postman のコレクションなど
-    └── environments/  # Postman の環境変数(Git 管理外)
+GitHub Actions(毎朝 4:00 JST)
+  → Open-Meteo で長崎市の今日の最低気温を取得
+  → しきい値以下なら SwitchBot API に turnOn を送信
+  → SwitchBot ハブ → 赤外線 → エアコン ON
 ```
+
+| 項目 | 値 |
+|---|---|
+| 実行時刻 | 毎日 19:00 UTC(= 4:00 JST) |
+| 対象地点 | 長崎市(緯度 32.75、経度 129.88) |
+| 判定に使う値 | 当日の最低気温の予報(`temperature_2m_min`) |
+| しきい値 | 10℃(環境変数 `AIRCON_THRESHOLD` で変更可) |
+| 条件 | 最低気温 ≤ しきい値 のとき ON |
+| 運転モード | エアコン側で設定済みのモード(自動)のまま ON |
+
+- GitHub Actions の定期実行は、混雑時に数分〜十数分遅れることがあります
+- 赤外線リモコンは信号を送信するだけなので、家電が実際に動作したかどうかは取得できません
+
+### 認証情報
+
+トークンやデバイス ID はリポジトリに含めず、ローカルでは `.env`、GitHub Actions では Secrets から環境変数として読み込みます。
+
+| 環境変数 | 内容 | 使うスクリプト |
+|---|---|---|
+| `SWITCHBOT_TOKEN` | SwitchBot のトークン | すべて |
+| `SWITCHBOT_SECRET` | SwitchBot のシークレット | すべて |
+| `SWITCHBOT_SCENE_ID` | 実行するシーンの ID | `scene.py` |
+| `SWITCHBOT_LIGHT_ID` | ライトの deviceId | `light.py` |
+| `SWITCHBOT_AIRCON_ID` | エアコンの deviceId | `auto_aircon.py` |
+| `AIRCON_THRESHOLD` | しきい値(℃)。未設定なら10 | `auto_aircon.py` |
 
 ## セットアップ
+
+### 必要なもの
+
+- Python 3.13
+- SwitchBot ハブと、ハブに登録した赤外線リモコン家電
+- SwitchBot のトークンとシークレット(SwitchBot アプリの「プロフィール → 設定 → アプリバージョンを10回タップ → 開発者向けオプション」で取得)
+
+### インストール
 
 ```
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # .env にトークンとシークレットを書く
-python devices.py
+cp .env.example .env
 ```
 
-トークンとシークレットは、SwitchBot アプリの「プロフィール → 設定 → アプリバージョンを10回タップ → 開発者向けオプション」で確認できます。
+`.env` に上の表の値を設定します。deviceId は `python devices.py` で確認できます。
 
-## 秘密情報の扱い
+### GitHub Actions の設定
 
-このリポジトリは **public** です。次のものはコミットしないでください。
+リポジトリの Secrets に、次の3つを登録します。
 
-- トークン、シークレット:`.env` に置きます
-- `deviceId`、`sceneId`:コードに直接書かず、`.env` などに置きます
-- Postman の環境変数:`postman/environments/` は `.gitignore` で除外しています
+```
+gh secret set SWITCHBOT_TOKEN
+gh secret set SWITCHBOT_SECRET
+gh secret set SWITCHBOT_AIRCON_ID
+```
 
-コミットする前に `git diff --staged` で中身を確認します。
+## 使い方
 
-## SwitchBot API メモ
+### ローカル
+
+```
+python devices.py        # デバイス一覧(deviceId・名前・種類)を表示
+python scene.py          # シーンを実行
+python light.py on       # ライトを ON
+python light.py off      # ライトを OFF
+python weather.py        # 長崎市の今日の最低気温を表示
+python auto_aircon.py    # 最低気温がしきい値以下ならエアコンを ON
+```
+
+しきい値を変えて実行する場合:
+
+```
+AIRCON_THRESHOLD=30 python auto_aircon.py
+```
+
+### GitHub Actions
+
+定期実行は自動で行われます。手動で実行する場合は、`threshold` でしきい値を指定できます(省略時は10℃)。
+
+```
+gh workflow run auto-aircon.yml -f threshold=30
+gh run view --log
+```
+
+GitHub の Actions タブにある **Run workflow** からも実行できます。
+
+## 技術スタック
+
+| 役割 | 技術 |
+|---|---|
+| 言語 | Python 3.13 |
+| 環境管理 | venv、pip(`requirements.txt`) |
+| HTTP 通信 | requests |
+| 設定の読み込み | python-dotenv |
+| 署名の生成 | hmac、hashlib、base64(標準ライブラリ) |
+| 家電の操作 | SwitchBot API v1.1 |
+| 天気データ | Open-Meteo Forecast API |
+| 定期実行 | GitHub Actions |
+| 認証情報の管理 | `.env`(ローカル)、GitHub Secrets(Actions) |
+| API の動作確認 | Postman |
+
+## ディレクトリ構成
+
+```
+hello-switch/
+├── switchbot_api.py     # SwitchBot API の共通処理(署名付きヘッダーの作成、コマンド送信)
+├── devices.py           # デバイス一覧を表示
+├── scene.py             # シーンを実行
+├── light.py             # ライトを ON/OFF
+├── weather.py           # 長崎市の今日の最低気温を取得
+├── auto_aircon.py       # 最低気温がしきい値以下ならエアコンを ON
+├── requirements.txt     # 依存ライブラリ
+├── .env.example         # 環境変数のひな形
+├── .github/workflows/
+│   └── auto-aircon.yml  # 毎朝 4:00 JST に auto_aircon.py を実行
+├── .postman/            # Postman ワークスペースの設定
+└── postman/             # Postman のコレクションなど
+```
+
+## 外部 API
+
+### SwitchBot API v1.1
 
 - ベース URL:`https://api.switch-bot.com/v1.1`
-- 認証ヘッダー:`Authorization`(トークン)、`sign`、`t`(ミリ秒の時刻)、`nonce`(ランダムな文字列)
-- 署名:`token + t + nonce` を、シークレットを鍵にして HMAC-SHA256 で計算し、Base64 にしたもの
-- 成功すると `statusCode: 100` が返る
+- 認証:リクエストごとに `Authorization`(トークン)、`t`(ミリ秒の UNIX 時刻)、`nonce`(UUID)、`sign` をヘッダーに付けます。`sign` は `token + t + nonce` をシークレットで HMAC-SHA256 署名し、Base64 エンコードした値です
+- 成功時のレスポンスは `statusCode: 100` です
 
 | 操作 | エンドポイント |
 |---|---|
@@ -85,23 +158,16 @@ python devices.py
 | シーン実行 | `POST /scenes/{sceneId}/execute` |
 | デバイス操作 | `POST /devices/{deviceId}/commands` |
 
-デバイス操作の Body の例:
+デバイス操作のリクエストボディ:
 
 ```json
 { "command": "turnOn", "parameter": "default", "commandType": "command" }
 ```
 
-ボタンを自分で学習させたリモコン(`DIY` 系や `Others`)の場合は、`"commandType": "customize"` にして、`command` にアプリでのボタン名を入れます。
+### Open-Meteo Forecast API
 
-赤外線リモコンは信号を送るだけなので、家電が実際に動いたかどうか(状態)は API で取得できません。
+```
+GET https://api.open-meteo.com/v1/forecast?latitude=32.75&longitude=129.88&daily=temperature_2m_min&timezone=Asia/Tokyo&forecast_days=1
+```
 
-## 進め方(ロードマップ)
-
-1. ✅ GitHub にリポジトリを作る
-2. ✅ venv を準備し、Python から API v1.1 を呼ぶ
-3. ライトの ON/OFF とシーンの実行を Python で行う
-4. コードを整理する(共通の処理を関数やモジュールにまとめる)
-5. Open-Meteo から長崎市の最低気温を取得する
-6. 気温に応じてエアコンを操作する判定を作る
-7. GitHub Actions で毎朝自動実行する
-8. アプリから操作できるようにする
+`daily.temperature_2m_min[0]` を当日の最低気温(℃)として使います。API キーは不要です。
